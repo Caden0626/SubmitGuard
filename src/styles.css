@@ -38,6 +38,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -343,14 +345,39 @@ input:focus-visible {
 .reveal {
   opacity: 0;
   transform: translateY(42px);
-  animation: reveal-up 1s var(--ease) forwards;
+  will-change: opacity, transform;
 }
+
+.hero--ready .reveal { animation: reveal-up 1s var(--ease) forwards; }
 
 .reveal--1 { animation-delay: .1s; }
 .reveal--2 { animation-delay: .18s; }
 .reveal--3 { animation-delay: .28s; }
 .reveal--4 { animation-delay: .42s; }
 .reveal--5 { animation-delay: .52s; }
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(34px);
+  transition: opacity .85s var(--ease), transform .85s var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-title,
+.workspace-heading h2,
+.how-title h2,
+.privacy-section h2 { text-wrap: balance; }
+
+.hero-sub,
+.workspace-heading p,
+.how-card p,
+.privacy-copy p { text-wrap: pretty; }
 
 .orbital {
   position: absolute;
@@ -1114,7 +1141,8 @@ input:focus-visible {
 .toast svg { color: var(--green); flex: 0 0 auto; }
 .toast--visible { opacity: 1; transform: translate(-50%, 0); }
 
-@keyframes reveal-up { to { opacity: 1; transform: translateY(0); } }
+@keyframes reveal-up { 72% { opacity: 1; transform: translateY(-5px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes reveal-gentle { to { opacity: 1; transform: translateY(0); } }
 @keyframes screen-enter { from { opacity: 0; transform: translateY(20px); } }
 @keyframes list-enter { from { opacity: 0; transform: translateY(14px); } }
 @keyframes rotate-orbit { to { transform: rotate(360deg); } }
@@ -1243,6 +1271,23 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+
+  /* Keep text entrance behavior consistent across Windows and mobile while
+     using a shorter travel distance and no overshoot. */
+  .hero--ready .reveal {
+    animation-name: reveal-gentle !important;
+    animation-duration: .72s !important;
+    animation-timing-function: ease-out !important;
+    animation-fill-mode: forwards !important;
+    animation-iteration-count: 1 !important;
+  }
+  .reveal--1 { animation-delay: .05s !important; }
+  .reveal--2 { animation-delay: .1s !important; }
+  .reveal--3 { animation-delay: .16s !important; }
+  .reveal--4 { animation-delay: .22s !important; }
+  .reveal--5 { animation-delay: .28s !important; }
+  .scroll-reveal { transform: translateY(14px); transition-duration: .7s !important; }
+  .scroll-reveal.is-visible { transform: translateY(0); }
 
   /* Keep the quiet, decorative hero signal alive while respecting the
      preference everywhere else. The slower timing avoids rapid motion. */

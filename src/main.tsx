@@ -197,16 +197,54 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
   onAnalyze: () => void
   showToast: (message: string) => void
 }) {
+  const intakeRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text')
+  const [heroReady, setHeroReady] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    let activated = false
+    const activate = () => {
+      if (!active || activated) return
+      activated = true
+      requestAnimationFrame(() => active && setHeroReady(true))
+    }
+    const fallback = window.setTimeout(activate, 650)
+    document.fonts?.ready.then(activate).catch(activate)
+    return () => {
+      active = false
+      window.clearTimeout(fallback)
+    }
+  }, [])
+
+  useEffect(() => {
+    const root = intakeRef.current
+    if (!root) return
+    const elements = Array.from(root.querySelectorAll<HTMLElement>('[data-scroll-reveal]'))
+    if (!('IntersectionObserver' in window)) {
+      elements.forEach((element) => element.classList.add('is-visible'))
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        entry.target.classList.add('is-visible')
+        observer.unobserve(entry.target)
+      })
+    }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' })
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [])
+
   const loadSample = () => {
     setRequirement(sampleRequirement)
     setInputMode('text')
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
   return (
-    <main className="intake-page">
-      <section className="hero">
+    <main className="intake-page" ref={intakeRef}>
+      <section className={`hero ${heroReady ? 'hero--ready' : ''}`}>
         <div className="hero-noise" />
         <div className="hero-copy">
           <div className="eyebrow reveal reveal--1"><Sparkles size={15} /> 作业提交前智能检查</div>
@@ -230,12 +268,12 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
       </section>
 
       <section className="workspace-section" id="workspace">
-        <div className="section-index">01 — ASSIGNMENT BRIEF</div>
+        <div className="section-index scroll-reveal" data-scroll-reveal>01 — ASSIGNMENT BRIEF</div>
         <div className="workspace-heading">
-          <h2>先告诉我们，<br />老师要求了什么。</h2>
-          <p>粘贴课程平台、邮件或评分标准中的要求。系统只生成候选规则，最终由你确认。</p>
+          <h2 className="scroll-reveal" data-scroll-reveal>先告诉我们，<br />老师要求了什么。</h2>
+          <p className="scroll-reveal" data-scroll-reveal style={{ '--reveal-delay': '90ms' } as React.CSSProperties}>粘贴课程平台、邮件或评分标准中的要求。系统只生成候选规则，最终由你确认。</p>
         </div>
-        <div className="intake-card">
+        <div className="intake-card scroll-reveal" data-scroll-reveal>
           <div className="input-tabs" role="tablist">
             <button className={inputMode === 'text' ? 'is-active' : ''} onClick={() => setInputMode('text')} role="tab">
               <FileText size={17} /> 粘贴要求
@@ -276,15 +314,15 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
       </section>
 
       <section className="how-section" id="how">
-        <div className="section-index">02 — HOW IT WORKS</div>
-        <div className="how-title"><h2>三步，把遗漏挡在提交之前。</h2><span>不是内容评分。<br />是提交合规检查。</span></div>
+        <div className="section-index scroll-reveal" data-scroll-reveal>02 — HOW IT WORKS</div>
+        <div className="how-title"><h2 className="scroll-reveal" data-scroll-reveal>三步，把遗漏挡在提交之前。</h2><span className="scroll-reveal" data-scroll-reveal style={{ '--reveal-delay': '90ms' } as React.CSSProperties}>不是内容评分。<br />是提交合规检查。</span></div>
         <div className="how-grid">
           {[
             ['01', '确认规则', '系统从要求中识别文件名、字数、章节与匿名规则；模糊项由你决定。'],
             ['02', '检查文件', '上传文字型 PDF，逐项核对文件属性、正文结构与元数据。'],
             ['03', '处理风险', '查看真实页码与提取文本，按明确建议回到原始文档完成处理。'],
           ].map(([number, title, copy], i) => (
-            <article className={`how-card how-card--${i + 1}`} key={number}>
+            <article className={`how-card how-card--${i + 1} scroll-reveal`} data-scroll-reveal key={number} style={{ '--reveal-delay': `${i * 90}ms` } as React.CSSProperties}>
               <span>{number}</span><div className="how-card__icon">{i === 0 ? <ScanLine /> : i === 1 ? <FileCheck2 /> : <ShieldCheck />}</div>
               <h3>{title}</h3><p>{copy}</p><ArrowRight className="how-card__arrow" />
             </article>
@@ -293,12 +331,12 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
       </section>
 
       <section className="privacy-section" id="privacy">
-        <div className="privacy-orb"><LockKeyhole size={42} /></div>
-        <div>
+        <div className="privacy-orb scroll-reveal" data-scroll-reveal><LockKeyhole size={42} /></div>
+        <div className="scroll-reveal" data-scroll-reveal>
           <span className="section-index">03 — PRIVACY BY DEFAULT</span>
           <h2>你的作业，<br />不该成为永久数据。</h2>
         </div>
-        <div className="privacy-copy">
+        <div className="privacy-copy scroll-reveal" data-scroll-reveal style={{ '--reveal-delay': '100ms' } as React.CSSProperties}>
           <p>真实 PDF 直接在当前浏览器中解析，不上传到 SubmitGuard 服务器；刷新或关闭页面后，文件对象会从当前会话释放。</p>
           <div><span>本地</span><small>浏览器内解析</small></div>
           <div><span>0</span><small>训练用途</small></div>
