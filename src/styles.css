@@ -818,6 +818,8 @@ input:focus-visible {
 .source-strip strong { font-size: 12px; }
 .source-strip small { margin-top: 4px; color: rgba(36,20,28,.48); font-size: 10px; }
 .source-strip button { padding: 9px 12px; display: flex; align-items: center; gap: 7px; color: var(--ink); border: 1px solid var(--line); background: transparent; border-radius: 9px; font-size: 10px; cursor: pointer; }
+.source-detail { margin: -8px 0 20px; padding: 20px 22px; border: 1px solid rgba(36,20,28,.1); border-radius: 16px; background: rgba(255,255,255,.42); animation: detail-open .3s ease both; }
+.source-detail p { margin: 10px 0 0; color: rgba(36,20,28,.72); font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
 
 .rules-toolbar { margin: 0 3px 10px; display: flex; justify-content: space-between; align-items: center; }
 .rules-toolbar span { color: rgba(36,20,28,.52); font: 500 10px/1 var(--mono); }
@@ -893,6 +895,8 @@ input:focus-visible {
   overflow: hidden;
 }
 .upload-zone::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at center 37%, rgba(255,137,111,.16), transparent 29%); }
+.upload-zone.is-validating { border-style: solid; border-color: rgba(255,137,111,.55); }
+.upload-zone.is-validating::after { background: radial-gradient(circle at center 37%, rgba(255,159,209,.25), transparent 34%); }
 .upload-zone input { display: none; }
 .upload-rings { position: relative; z-index: 1; width: 142px; height: 142px; margin-bottom: 26px; display: grid; place-items: center; }
 .upload-rings > span { position: absolute; inset: 0; border: 1px solid rgba(36,20,28,.12); border-radius: 50%; animation: upload-pulse 3s ease infinite; }
@@ -903,6 +907,7 @@ input:focus-visible {
 .upload-zone h2 { z-index: 1; margin: 14px 0 7px; font-size: clamp(27px, 3vw, 42px); letter-spacing: -.055em; }
 .upload-zone p { z-index: 1; margin: 0 0 20px; color: rgba(36,20,28,.5); font-size: 13px; }
 .upload-zone > button { z-index: 1; padding: 13px 17px; display: flex; align-items: center; gap: 18px; color: var(--cream); background: var(--ink); border-radius: 11px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.upload-zone > button:disabled { opacity: .42; cursor: wait; }
 .upload-zone > button.demo-link { margin-top: 13px; padding: 8px; color: rgba(36,20,28,.66); background: transparent; font-weight: 600; }
 .upload-specs { z-index: 1; margin-top: auto; padding-top: 32px; display: flex; align-items: center; gap: 13px; color: rgba(36,20,28,.46); font: 500 9px/1 var(--mono); }
 .upload-specs i { width: 3px; height: 3px; background: rgba(36,20,28,.3); border-radius: 50%; }
@@ -1044,6 +1049,8 @@ input:focus-visible {
 .preview-panel { min-width: 0; display: grid; grid-template-rows: 48px 1fr 46px; background: #e9e2dc; }
 .preview-topbar { padding: 0 15px; display: flex; justify-content: space-between; align-items: center; color: rgba(36,20,28,.63); border-bottom: 1px solid rgba(36,20,28,.13); background: #f1ebe5; font-size: 9px; }
 .preview-topbar > div { display: flex; align-items: center; gap: 7px; }
+.preview-topbar > div:first-child { min-width: 0; }
+.preview-topbar > div:first-child span { max-width: 220px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .preview-topbar button { width: 25px; height: 25px; padding: 0; display: grid; place-items: center; color: var(--ink); background: transparent; border-radius: 5px; cursor: pointer; }
 .preview-topbar button:hover { background: rgba(36,20,28,.07); }
 .preview-canvas { position: relative; padding: 30px; display: grid; place-items: start center; overflow: auto; background-image: radial-gradient(rgba(36,20,28,.12) .7px, transparent .7px); background-size: 8px 8px; }
@@ -1053,6 +1060,11 @@ input:focus-visible {
 .pdf-author { margin: 0; font: 400 8px/1.4 var(--mono); }
 .pdf-author mark { padding: 1px 3px; color: #7e2121; background: #ffc8c2; }
 .pdf-rule { height: 1px; margin: 23px 0; background: rgba(36,20,28,.28); }
+.pdf-copy { max-height: 390px; overflow: hidden; }
+.pdf-copy p { margin: 0 0 11px; color: rgba(41,40,42,.72); font: 400 9px/1.55 var(--mono); overflow-wrap: anywhere; }
+.pdf-copy p.is-highlighted { margin-inline: -10px; padding: 8px 10px; border-left: 2px solid var(--coral); background: rgba(255,216,206,.4); }
+.pdf-copy--empty { min-height: 250px; display: grid; place-content: center; justify-items: center; gap: 12px; color: rgba(41,40,42,.38); text-align: center; }
+.pdf-copy--empty p { max-width: 220px; margin: 0; }
 .pdf-line { height: 5px; margin: 0 0 11px; background: #dedede; border-radius: 5px; }
 .pdf-line.short { width: 64%; }
 .pdf-highlight { position: relative; height: 58px; margin: 18px -10px; border: 1px dashed #c57c33; background: rgba(255, 228, 169, .35); }
