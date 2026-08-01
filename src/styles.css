@@ -379,10 +379,19 @@ input:focus-visible {
 .orbital circle {
   fill: var(--pink);
   filter: drop-shadow(0 0 9px rgba(255, 159, 209, .8));
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbit-node-pulse 2.6s ease-in-out infinite;
 }
 
-.orbit--one { transform-origin: center; animation: rotate-orbit 18s linear infinite; }
-.orbit--two { transform-origin: center; animation: rotate-orbit 27s linear infinite reverse; }
+.orbit {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.orbit--one { animation: rotate-orbit 18s linear infinite; }
+.orbit--two { animation: rotate-orbit 27s linear infinite reverse; }
 .orbit--three { transform-origin: center; animation: breathe 6s ease-in-out infinite; }
 .orbit-wave { stroke: rgba(255, 159, 209, .68) !important; stroke-dasharray: 8 12; animation: dash 13s linear infinite; }
 
@@ -401,6 +410,22 @@ input:focus-visible {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 14px rgba(255, 137, 111, .06), 0 25px 60px rgba(0, 0, 0, .22);
+  animation: core-glow 3.6s ease-in-out infinite;
+}
+
+.orbital-core::before,
+.orbital-core::after {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border: 1px solid rgba(255, 137, 111, .2);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: core-ring 3.6s ease-out infinite;
+}
+
+.orbital-core::after {
+  animation-delay: 1.8s;
 }
 
 .orbital-core span,
@@ -1083,6 +1108,9 @@ input:focus-visible {
 @keyframes rotate-orbit { to { transform: rotate(360deg); } }
 @keyframes dash { to { stroke-dashoffset: -200; } }
 @keyframes breathe { 50% { transform: scale(.94) rotate(4deg); opacity: .65; } }
+@keyframes orbit-node-pulse { 50% { transform: scale(1.35); opacity: .72; } }
+@keyframes core-glow { 50% { box-shadow: 0 0 0 20px rgba(255, 137, 111, .035), 0 25px 72px rgba(0, 0, 0, .3); } }
+@keyframes core-ring { 0% { transform: scale(.9); opacity: 0; } 35% { opacity: .7; } 100% { transform: scale(1.28); opacity: 0; } }
 @keyframes cue-bounce { 50% { transform: translateY(6px); } }
 @keyframes signal-pulse { 50% { opacity: .45; box-shadow: 0 0 0 8px rgba(185,243,154,.03); } }
 @keyframes upload-pulse { 50% { transform: scale(.95); opacity: .42; } }
@@ -1203,6 +1231,18 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+
+  /* Keep the quiet, decorative hero signal alive while respecting the
+     preference everywhere else. The slower timing avoids rapid motion. */
+  .orbit--one { animation: rotate-orbit 36s linear infinite !important; }
+  .orbit--two { animation: rotate-orbit 52s linear infinite reverse !important; }
+  .orbit--three { animation: breathe 12s ease-in-out infinite !important; }
+  .orbit-wave { animation: dash 26s linear infinite !important; }
+  .orbital circle { animation: orbit-node-pulse 4.8s ease-in-out infinite !important; }
+  .orbital-core { animation: core-glow 7s ease-in-out infinite !important; }
+  .orbital-core::before,
+  .orbital-core::after { animation: core-ring 7s ease-out infinite !important; }
+  .orbital-core::after { animation-delay: 3.5s !important; }
 }
 
 @media print {
