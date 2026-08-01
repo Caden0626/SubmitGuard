@@ -30,34 +30,19 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import {
+  extractRequirementRules,
+  inspectPdf,
+  readPdfSummary,
+  type CheckItem,
+  type PdfInspectionResult,
+  type RequirementRule,
+  type Severity,
+  type UploadedPdf,
+} from './pdfInspection'
 import './styles.css'
 
 type Stage = 'intake' | 'rules' | 'upload' | 'processing' | 'results'
-type Severity = 'must_fix' | 'review' | 'passed'
-
-type RequirementRule = {
-  id: number
-  type: string
-  label: string
-  value: string
-  source: string
-  confidence: number
-  confirmed: boolean
-}
-
-type CheckItem = {
-  id: string
-  severity: Severity
-  title: string
-  detail: string
-  requirement: string
-  current: string
-  action: string
-  location: string
-  page?: number
-  fixable?: boolean
-  resolved?: boolean
-}
 
 const sampleRequirement = `Submit a 2,500-word individual report as a PDF. Use the file name StudentID_LastName_BA602.pdf. The report must include an Executive Summary, Introduction, Analysis, Conclusion and References. The main body must not exceed 2,500 words; references and appendices are excluded. For anonymous marking, do not include your name or email anywhere in the document. Maximum 15 pages and 20 MB. Use APA 7 referencing.`
 
@@ -234,7 +219,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
           </p>
           <div className="hero-meta reveal reveal--5">
             <span><CheckCircle2 size={15} /> 不评价内容质量</span>
-            <span><LockKeyhole size={15} /> 文件 24 小时内删除</span>
+            <span><LockKeyhole size={15} /> 文件仅在浏览器本地处理</span>
             <span><Zap size={15} /> 确定性检查优先</span>
           </div>
         </div>
@@ -297,7 +282,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
           {[
             ['01', '确认规则', '系统从要求中识别文件名、字数、章节与匿名规则；模糊项由你决定。'],
             ['02', '检查文件', '上传文字型 PDF，逐项核对文件属性、正文结构与元数据。'],
-            ['03', '处理风险', '查看页码与上下文，安全问题一键修复，其余问题获得明确建议。'],
+            ['03', '处理风险', '查看真实页码与提取文本，按明确建议回到原始文档完成处理。'],
           ].map(([number, title, copy], i) => (
             <article className={`how-card how-card--${i + 1}`} key={number}>
               <span>{number}</span><div className="how-card__icon">{i === 0 ? <ScanLine /> : i === 1 ? <FileCheck2 /> : <ShieldCheck />}</div>
@@ -314,8 +299,8 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
           <h2>你的作业，<br />不该成为永久数据。</h2>
         </div>
         <div className="privacy-copy">
-          <p>上传的文件仅用于本次检查。原文件与处理后的文件默认在 24 小时内自动删除，你也可以随时主动删除。</p>
-          <div><span>24H</span><small>自动删除周期</small></div>
+          <p>真实 PDF 直接在当前浏览器中解析，不上传到 SubmitGuard 服务器；刷新或关闭页面后，文件对象会从当前会话释放。</p>
+          <div><span>本地</span><small>浏览器内解析</small></div>
           <div><span>0</span><small>训练用途</small></div>
         </div>
       </section>
@@ -335,13 +320,15 @@ function AppShell({ stage, children }: { stage: Stage; children: React.ReactNode
   )
 }
 
-function RulesScreen({ rules, setRules, onBack, onContinue }: {
+function RulesScreen({ rules, setRules, requirement, onBack, onContinue }: {
   rules: RequirementRule[]
   setRules: React.Dispatch<React.SetStateAction<RequirementRule[]>>
+  requirement: string
   onBack: () => void
   onContinue: () => void
 }) {
   const confirmed = rules.filter((rule) => rule.confirmed).length
+  const [sourceOpen, setSourceOpen] = useState(false)
   const updateRule = (id: number, patch: Partial<RequirementRule>) => setRules((all) => all.map((rule) => rule.id === id ? { ...rule, ...patch } : rule))
   const deleteRule = (id: number) => setRules((all) => all.filter((rule) => rule.id !== id))
   const addRule = () => setRules((all) => [...all, {
@@ -359,8 +346,9 @@ function RulesScreen({ rules, setRules, onBack, onContinue }: {
       </div>
       <div className="source-strip">
         <div><FileText size={19} /><span><strong>作业要求已解析</strong><small>共识别 {rules.length} 条候选规则</small></span></div>
-        <button><Eye size={16} /> 查看原始要求</button>
+        <button onClick={() => setSourceOpen((open) => !open)} aria-expanded={sourceOpen}><Eye size={16} /> {sourceOpen ? '收起原始要求' : '查看原始要求'}</button>
       </div>
+      {sourceOpen && <div className="source-detail"><span className="screen-kicker">ORIGINAL REQUIREMENT</span><p>{requirement}</p></div>}
       <div className="rules-toolbar">
         <span>{rules.length} 条规则</span>
         <button onClick={() => setRules((all) => all.map((rule) => ({ ...rule, confirmed: true })))}><CheckCircle2 size={16} /> 全部确认</button>
@@ -396,23 +384,36 @@ function RulesScreen({ rules, setRules, onBack, onContinue }: {
 function UploadScreen({ onBack, onCheck, file, setFile, showToast }: {
   onBack: () => void
   onCheck: () => void
-  file: { name: string; size: string; pages: number } | null
-  setFile: (file: { name: string; size: string; pages: number } | null) => void
+  file: UploadedPdf | null
+  setFile: (file: UploadedPdf | null) => void
   showToast: (message: string) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const useDemo = () => setFile({ name: 'final-report-v7.pdf', size: '3.8 MB', pages: 13 })
-  const handleFile = (chosen?: File) => {
+  const [isValidating, setIsValidating] = useState(false)
+  const useDemo = () => setFile({
+    file: null,
+    isDemo: true,
+    name: 'final-report-v7.pdf',
+    size: '3.8 MB',
+    sizeBytes: 3.8 * 1024 * 1024,
+    pages: 13,
+    metadata: { author: 'Alex Morgan', creator: 'Microsoft Word' },
+    sampleCharacters: 13840,
+  })
+  const handleFile = async (chosen?: File) => {
     if (!chosen) return
-    if (!chosen.name.toLowerCase().endsWith('.pdf') || chosen.type && chosen.type !== 'application/pdf') {
-      showToast('请上传真实的 PDF 文件。基础版暂不支持 Word 或图片。')
-      return
+    setIsValidating(true)
+    try {
+      const summary = await readPdfSummary(chosen)
+      setFile(summary)
+      showToast(`已验证 ${summary.pages} 页文字型 PDF，文件仅在当前浏览器中处理。`)
+    } catch (error) {
+      setFile(null)
+      showToast(error instanceof Error ? error.message : 'PDF 验证失败，请更换文件后重试。')
+    } finally {
+      setIsValidating(false)
+      if (inputRef.current) inputRef.current.value = ''
     }
-    if (chosen.size > 30 * 1024 * 1024) {
-      showToast('文件超过 30 MB，请压缩后重新上传。')
-      return
-    }
-    setFile({ name: chosen.name, size: `${Math.max(0.1, chosen.size / 1024 / 1024).toFixed(1)} MB`, pages: 13 })
   }
   return (
     <AppShell stage="upload">
@@ -421,28 +422,28 @@ function UploadScreen({ onBack, onCheck, file, setFile, showToast }: {
         <div className="screen-title-row"><div><span className="screen-kicker">DOCUMENT CHECK</span><h1>上传你的作业</h1><p>目前仅支持单个、未加密且可提取文字的 PDF，最大 30 MB。</p></div></div>
       </div>
       {!file ? (
-        <div className="upload-zone" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}>
+        <div className={`upload-zone ${isValidating ? 'is-validating' : ''}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void handleFile(e.dataTransfer.files[0]) }}>
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={(e) => handleFile(e.target.files?.[0])} />
-          <div className="upload-rings"><span /><span /><span /><div><Upload size={27} /></div></div>
-          <span className="screen-kicker">DROP ZONE · PDF ONLY</span>
-          <h2>把最终版 PDF 放在这里</h2>
-          <p>拖放文件，或从电脑中选择</p>
-          <button onClick={() => inputRef.current?.click()}>选择 PDF 文件 <ArrowRight size={17} /></button>
-          <button className="demo-link" onClick={useDemo}><Sparkles size={15} /> 使用演示文件体验完整流程</button>
+          <div className="upload-rings"><span /><span /><span /><div>{isValidating ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}</div></div>
+          <span className="screen-kicker">{isValidating ? 'LOCAL VALIDATION' : 'DROP ZONE · PDF ONLY'}</span>
+          <h2>{isValidating ? '正在验证 PDF' : '把最终版 PDF 放在这里'}</h2>
+          <p>{isValidating ? '检查文件签名、加密状态与可提取文字' : '拖放文件，或从电脑中选择'}</p>
+          <button onClick={() => inputRef.current?.click()} disabled={isValidating}>选择 PDF 文件 <ArrowRight size={17} /></button>
+          <button className="demo-link" onClick={useDemo} disabled={isValidating}><Sparkles size={15} /> 使用演示文件体验完整流程</button>
           <div className="upload-specs"><span>PDF</span><i /><span>≤ 30 MB</span><i /><span>文字型文件</span></div>
         </div>
       ) : (
         <div className="file-ready">
           <div className="file-visual"><FileText size={40} /><span>PDF</span><i><Check size={14} /></i></div>
-          <div className="file-details"><span className="screen-kicker">READY TO CHECK</span><h2>{file.name}</h2><p>{file.size} · {file.pages} 页 · PDF 文件</p></div>
-          <div className="file-health"><span><CheckCircle2 size={17} /> 文件可正常读取</span><span><CheckCircle2 size={17} /> 未加密</span><span><CheckCircle2 size={17} /> 包含可提取文字</span></div>
+          <div className="file-details"><span className="screen-kicker">{file.isDemo ? 'DEMO DOCUMENT' : 'READY TO CHECK'}</span><h2>{file.name}</h2><p>{file.size} · {file.pages} 页 · PDF 文件</p></div>
+          <div className="file-health"><span><CheckCircle2 size={17} /> 文件结构有效</span><span><CheckCircle2 size={17} /> 未加密</span><span><CheckCircle2 size={17} /> {file.isDemo ? '演示数据已就绪' : `已验证可提取文字`}</span></div>
           <button className="file-remove" onClick={() => setFile(null)}><Trash2 size={16} /> 移除</button>
         </div>
       )}
       <div className="upload-privacy">
         <ShieldCheck size={25} />
-        <div><strong>隐私保护已开启</strong><p>文件使用随机路径处理，默认 24 小时内删除，不用于模型训练。</p></div>
-        <span>DELETE IN<br /><b>24:00:00</b></span>
+        <div><strong>本地隐私模式已开启</strong><p>真实 PDF 只在当前浏览器中解析，不会上传到 SubmitGuard 服务器。</p></div>
+        <span>LOCAL<br /><b>ONLY</b></span>
       </div>
       <div className="sticky-actions sticky-actions--simple">
         <div><Info size={17} /><span>检查不会修改你的原始文件</span></div>
@@ -488,25 +489,28 @@ const severityMeta: Record<Severity, { label: string; icon: React.ReactNode }> =
   passed: { label: '已通过', icon: <Check size={14} /> },
 }
 
-function PdfPreview({ active }: { active: CheckItem }) {
-  const targetPage = active.page || (active.id === 'metadata' || active.id === 'filename' ? 1 : 2)
+function PdfPreview({ active, filename, pageTexts }: { active: CheckItem; filename: string; pageTexts: string[] }) {
+  const targetPage = active.page || 1
+  const pageText = pageTexts[targetPage - 1] || ''
+  const previewLines = pageText.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 16)
   return (
     <aside className="preview-panel">
       <div className="preview-topbar">
-        <div><FileText size={16} /><span>final-report-v7.pdf</span></div>
-        <div><button>−</button><span>82%</span><button>+</button><button><MoreHorizontal size={16} /></button></div>
+        <div><FileText size={16} /><span>{filename}</span></div>
+        <div><span>文本定位预览</span><button aria-label="更多预览选项"><MoreHorizontal size={16} /></button></div>
       </div>
       <div className="preview-canvas">
         <div className="pdf-sheet">
-          <div className="pdf-sheet__eyebrow">BUSINESS ANALYTICS · BA602</div>
-          <h3>{targetPage === 1 ? 'Individual Report' : targetPage === 11 ? 'Final Remarks' : targetPage === 12 ? 'References' : 'Market Analysis'}</h3>
-          <p className="pdf-author">Student ID: 24019381 {active.id === 'metadata' && <mark>Alex Morgan</mark>}</p>
+          <div className="pdf-sheet__eyebrow">EXTRACTED TEXT · PAGE {targetPage}</div>
+          <h3>{previewLines[0] || '页面文本预览'}</h3>
           <div className="pdf-rule" />
-          {[0, 1, 2, 3, 4, 5, 6].map((line) => <div className={`pdf-line ${line === 3 ? 'short' : ''}`} key={line} />)}
-          {(active.id === 'summary' || active.id === 'wordcount' || active.id === 'conclusion') && (
-            <div className={`pdf-highlight pdf-highlight--${active.severity}`}><span>{active.id === 'summary' ? '未找到对应章节' : active.id === 'conclusion' ? '可能匹配 Conclusion' : '正文估算范围'}</span></div>
+          {previewLines.length ? (
+            <div className="pdf-copy">
+              {previewLines.slice(1).map((line, index) => <p className={index === 2 ? 'is-highlighted' : ''} key={`${line}-${index}`}>{line}</p>)}
+            </div>
+          ) : (
+            <div className="pdf-copy pdf-copy--empty"><ScanLine size={24} /><p>该检查项属于文件属性，或此页没有可提取文本。</p></div>
           )}
-          <div className="pdf-columns"><div>{[0,1,2,3].map(i => <div className="pdf-line" key={i} />)}</div><div>{[0,1,2,3].map(i => <div className="pdf-line" key={i} />)}</div></div>
           <span className="page-number">{targetPage}</span>
         </div>
       </div>
@@ -515,9 +519,11 @@ function PdfPreview({ active }: { active: CheckItem }) {
   )
 }
 
-function ResultsScreen({ checks, setChecks, onRestart, showToast }: {
+function ResultsScreen({ checks, setChecks, file, inspection, onRestart, showToast }: {
   checks: CheckItem[]
   setChecks: React.Dispatch<React.SetStateAction<CheckItem[]>>
+  file: UploadedPdf
+  inspection: PdfInspectionResult | null
   onRestart: () => void
   showToast: (message: string) => void
 }) {
@@ -539,7 +545,7 @@ function ResultsScreen({ checks, setChecks, onRestart, showToast }: {
   return (
     <AppShell stage="results">
       <div className="results-hero">
-        <div className="results-title"><span className="screen-kicker">CHECK COMPLETED · JUST NOW</span><h1>检查完成</h1><p>准备度只反映文件与已确认规则的匹配情况，不代表作业质量或最终成绩。</p></div>
+        <div className="results-title"><span className="screen-kicker">CHECK COMPLETED · {file.pages} PAGES · {file.size}</span><h1>检查完成</h1><p>准备度只反映文件与已确认规则的匹配情况，不代表作业质量或最终成绩。</p></div>
         <div className={`readiness readiness--${score >= 80 ? 'good' : 'warn'}`}>
           <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="51" /><circle className="readiness-progress" cx="60" cy="60" r="51" style={{ strokeDashoffset: 320 - (320 * score / 100) }} /></svg>
           <div><strong>{score}</strong><span>/ 100</span><small>提交准备度</small></div>
@@ -576,7 +582,7 @@ function ResultsScreen({ checks, setChecks, onRestart, showToast }: {
                     <div><span>老师要求</span><p>{item.requirement}</p></div>
                     <div><span>当前情况</span><p>{item.current}</p></div>
                     <div className="issue-suggestion"><Sparkles size={16} /><span><b>建议</b>{item.action}</span></div>
-                    {item.severity !== 'passed' && (
+                    {(item.severity === 'review' || item.fixable) && (
                       <button className={item.fixable ? 'fix-button' : 'confirm-button'} onClick={() => resolve(item)}>
                         {item.fixable ? <><WandSparkles size={16} /> 安全修复</> : <><Check size={16} /> 我已确认</>}
                       </button>
@@ -588,12 +594,12 @@ function ResultsScreen({ checks, setChecks, onRestart, showToast }: {
             {visible.length === 0 && <div className="empty-state"><CheckCircle2 size={30} /><h3>这个分类里没有问题</h3><p>你可以切换到其他筛选条件继续查看。</p></div>}
           </div>
         </section>
-        <PdfPreview active={active} />
+        <PdfPreview active={active} filename={file.name} pageTexts={inspection?.pageTexts || []} />
       </div>
 
       <div className="completion-bar">
         <div><span className={`completion-dot ${counts.must_fix === 0 ? 'is-ready' : ''}`} /><span><strong>{counts.must_fix === 0 ? '文件已适合进入提交前人工复核' : `还有 ${counts.must_fix} 项必须修复`}</strong><small>{counts.review} 项建议检查 · 原始文件保持不变</small></span></div>
-        <div><button onClick={onRestart}><RotateCcw size={16} /> 重新检查</button><button className="primary-action" onClick={() => showToast('基础版演示：处理后的 PDF 下载将在接入后端后启用。')} disabled={counts.must_fix > 0}><span>下载处理后文件</span><Download size={17} /></button></div>
+        <div><button onClick={onRestart}><RotateCcw size={16} /> 重新检查</button><button className="primary-action" onClick={() => { showToast('检查报告已准备好；打印窗口即将打开。'); setTimeout(() => window.print(), 350) }}><span>下载检查报告</span><Download size={17} /></button></div>
       </div>
     </AppShell>
   )
@@ -607,9 +613,10 @@ function App() {
   const [stage, setStage] = useState<Stage>('intake')
   const [requirement, setRequirement] = useState('')
   const [rules, setRules] = useState(initialRules)
-  const [file, setFile] = useState<{ name: string; size: string; pages: number } | null>(null)
+  const [file, setFile] = useState<UploadedPdf | null>(null)
   const [progress, setProgress] = useState(0)
   const [checks, setChecks] = useState(initialChecks)
+  const [inspection, setInspection] = useState<PdfInspectionResult | null>(null)
   const [toast, setToast] = useState('')
 
   const showToast = (message: string) => {
@@ -621,25 +628,11 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [stage])
 
-  useEffect(() => {
-    if (stage !== 'processing') return
-    setProgress(0)
-    let current = 0
-    const interval = window.setInterval(() => {
-      current += 1
-      setProgress(current)
-      if (current >= processSteps.length) {
-        window.clearInterval(interval)
-        window.setTimeout(() => setStage('results'), 650)
-      }
-    }, 680)
-    return () => window.clearInterval(interval)
-  }, [stage])
-
   const reset = () => {
     setStage('intake')
     setFile(null)
     setChecks(initialChecks)
+    setInspection(null)
   }
 
   const analyze = () => {
@@ -648,17 +641,60 @@ function App() {
       document.querySelector('#workspace')?.scrollIntoView({ behavior: 'smooth' })
       return
     }
+    setRules(extractRequirementRules(requirement))
     setStage('rules')
+  }
+
+  const beginCheck = async () => {
+    if (!file) return
+    setStage('processing')
+    setProgress(0)
+    setInspection(null)
+    const startedAt = Date.now()
+    try {
+      if (file.isDemo) {
+        for (let step = 0; step < processSteps.length; step += 1) {
+          setProgress(step)
+          await new Promise((resolve) => window.setTimeout(resolve, 420))
+        }
+        setChecks(initialChecks)
+        setInspection({
+          checks: initialChecks,
+          pageTexts: [
+            'BUSINESS ANALYTICS · BA602\nIndividual Report\nStudent ID: 24019381\nAlex Morgan\nExecutive overview and market context',
+            'Market Analysis\nThis report evaluates the available data and summarizes the main findings.',
+            ...Array.from({ length: 8 }, (_, index) => `Analysis section · Page ${index + 3}\nExtracted demonstration text for the SubmitGuard workflow.`),
+            'Final Remarks\nThe analysis indicates several operational opportunities.',
+            'References\nSample reference list and source notes.',
+            'Appendix\nSupporting figures and tables.',
+          ],
+          totalWords: 2712,
+          bodyWords: 2468,
+          metadata: file.metadata,
+        })
+      } else {
+        const result = await inspectPdf(file, rules, setProgress)
+        const remainingDelay = Math.max(0, 1400 - (Date.now() - startedAt))
+        if (remainingDelay) await new Promise((resolve) => window.setTimeout(resolve, remainingDelay))
+        setChecks(result.checks)
+        setInspection(result)
+      }
+      setProgress(processSteps.length)
+      window.setTimeout(() => setStage('results'), 360)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '检查失败，请重新上传 PDF 后再试。')
+      setStage('upload')
+    }
   }
 
   return (
     <div className={`site site--${stage}`}>
       <TopNav stage={stage} onReset={reset} />
       {stage === 'intake' && <Intake requirement={requirement} setRequirement={setRequirement} onAnalyze={analyze} showToast={showToast} />}
-      {stage === 'rules' && <RulesScreen rules={rules} setRules={setRules} onBack={() => setStage('intake')} onContinue={() => setStage('upload')} />}
-      {stage === 'upload' && <UploadScreen onBack={() => setStage('rules')} onCheck={() => setStage('processing')} file={file} setFile={setFile} showToast={showToast} />}
+      {stage === 'rules' && <RulesScreen rules={rules} setRules={setRules} requirement={requirement} onBack={() => setStage('intake')} onContinue={() => setStage('upload')} />}
+      {stage === 'upload' && <UploadScreen onBack={() => setStage('rules')} onCheck={() => void beginCheck()} file={file} setFile={setFile} showToast={showToast} />}
       {stage === 'processing' && <ProcessingScreen progress={progress} />}
-      {stage === 'results' && <ResultsScreen checks={checks} setChecks={setChecks} onRestart={() => setStage('upload')} showToast={showToast} />}
+      {stage === 'results' && file && <ResultsScreen checks={checks} setChecks={setChecks} file={file} inspection={inspection} onRestart={() => setStage('upload')} showToast={showToast} />}
       <Toast message={toast} />
     </div>
   )
