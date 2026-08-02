@@ -169,17 +169,21 @@ function OrbitalGraphic() {
     <div className="orbital" aria-hidden="true">
       <svg viewBox="0 0 720 720" role="presentation">
         <g className="orbit orbit--one">
-          <ellipse cx="360" cy="360" rx="282" ry="126" transform="rotate(-18 360 360)" />
-          <circle cx="92" cy="435" r="9" />
+          <g transform="rotate(-18 360 360)">
+            <ellipse cx="360" cy="360" rx="282" ry="126" />
+            <circle className="orbit-node orbit-node--one" cx="78" cy="360" r="9" />
+          </g>
         </g>
         <g className="orbit orbit--two">
-          <ellipse cx="360" cy="360" rx="235" ry="305" transform="rotate(44 360 360)" />
-          <circle cx="546" cy="191" r="7" />
+          <g transform="rotate(44 360 360)">
+            <ellipse cx="360" cy="360" rx="235" ry="305" />
+            <circle className="orbit-node orbit-node--two" cx="360" cy="55" r="8" />
+          </g>
         </g>
         <g className="orbit orbit--three">
           <ellipse cx="360" cy="360" rx="318" ry="205" transform="rotate(52 360 360)" />
         </g>
-        <path className="orbit-wave" d="M98 421C178 311 247 521 350 360s205 42 278-102" />
+        <path className="orbit-wave" d="M150 421C205 326 258 507 350 360C430 250 495 418 560 270" />
       </svg>
       <div className="orbital-core">
         <ShieldCheck size={54} strokeWidth={1.4} />

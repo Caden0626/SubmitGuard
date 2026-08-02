@@ -378,7 +378,7 @@ input:focus-visible {
 .orbital {
   position: absolute;
   z-index: 1;
-  right: -5vw;
+  right: -1vw;
   top: 50%;
   width: min(58vw, 820px);
   aspect-ratio: 1;
@@ -399,13 +399,15 @@ input:focus-visible {
   vector-effect: non-scaling-stroke;
 }
 
-.orbital circle {
+.orbit-node {
   fill: var(--pink);
   filter: drop-shadow(0 0 9px rgba(255, 159, 209, .8));
   transform-box: fill-box;
   transform-origin: center;
   animation: orbit-node-pulse 2.6s ease-in-out infinite;
 }
+
+.orbit-node--two { animation-delay: -1.3s; }
 
 .orbit {
   transform-box: view-box;
@@ -459,16 +461,27 @@ input:focus-visible {
 
 .orbit-label {
   position: absolute;
+  z-index: 3;
   padding: 7px 10px;
   color: rgba(255, 223, 214, .65);
   border: 1px solid rgba(255, 216, 206, .2);
   border-radius: 999px;
   background: rgba(36, 20, 28, .52);
   backdrop-filter: blur(8px);
+  white-space: nowrap;
 }
 
-.orbit-label--a { top: 17%; left: 19%; }
-.orbit-label--b { bottom: 19%; right: 7%; }
+.orbit-label--a {
+  left: 20.83%;
+  top: 58.5%;
+  transform: translate(-100%, -50%);
+}
+
+.orbit-label--b {
+  left: 77.78%;
+  top: 37.5%;
+  transform: translateY(-50%);
+}
 
 .scroll-cue {
   position: absolute;
@@ -1158,7 +1171,7 @@ input:focus-visible {
   .nav-center { display: none; }
   .hero { grid-template-columns: 1fr; }
   .hero-copy { max-width: 72%; }
-  .orbital { right: -18vw; width: 70vw; opacity: .7; }
+  .orbital { right: -5vw; width: 68vw; opacity: .72; }
   .privacy-section { grid-template-columns: .38fr 1fr; }
   .privacy-copy { grid-column: 2; }
   .results-workspace { grid-template-columns: minmax(390px,.95fr) 1.05fr; }
@@ -1291,7 +1304,8 @@ input:focus-visible {
   .orbit--two { animation: rotate-orbit 52s linear infinite reverse !important; }
   .orbit--three { animation: breathe 12s ease-in-out infinite !important; }
   .orbit-wave { animation: dash 26s linear infinite !important; }
-  .orbital circle { animation: orbit-node-pulse 4.8s ease-in-out infinite !important; }
+  .orbit-node { animation: orbit-node-pulse 4.8s ease-in-out infinite !important; }
+  .orbit-node--two { animation-delay: -2.4s !important; }
   .orbital-core { animation: core-glow 7s ease-in-out infinite !important; }
   .orbital-core::before,
   .orbital-core::after { animation: core-ring 7s ease-out infinite !important; }
