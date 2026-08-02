@@ -41,6 +41,9 @@ import {
   type UploadedPdf,
 } from './pdfInspection'
 import Hero3D from './Hero3D'
+import Ribbons from './Ribbons'
+import DotField from './DotField'
+import StaggeredMenu from './StaggeredMenu'
 import './styles.css'
 
 type Stage = 'intake' | 'rules' | 'upload' | 'processing' | 'results'
@@ -121,32 +124,49 @@ function LogoMark() {
 }
 
 function TopNav({ stage, onReset }: { stage: Stage; onReset: () => void }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
   const goToStart = () => {
     onReset()
-    setMobileOpen(false)
     window.setTimeout(() => document.querySelector('#workspace')?.scrollIntoView({ behavior: 'smooth' }), 80)
   }
+
+  const menuItems = [
+    { label: '工作方式', link: '#how' },
+    { label: '隐私', link: '#privacy' },
+    { label: '开始检查', link: '#workspace' },
+  ]
+
+  const handleNavigate = (link: string) => {
+    if (link === '#workspace') {
+      goToStart()
+    } else if (link === '#home') {
+      onReset()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      window.setTimeout(() => document.querySelector(link)?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }
+
+  const pillItems = [
+    { label: 'Home', href: '#home' },
+    { label: 'Check', href: '#workspace' },
+    { label: 'Modify', href: '#modify', disabled: true },
+  ]
+
   return (
-    <header className={`top-nav ${stage !== 'intake' ? 'top-nav--light' : ''}`}>
-      <button className="brand" onClick={onReset} aria-label="回到首页">
-        <LogoMark />
-        <span>SubmitGuard</span>
-      </button>
-      <div className="nav-center">
-        <span className="signal"><i /> SYSTEM READY</span>
-        <span className="nav-divider" />
-        <span>PRIVATE BETA · 01</span>
-      </div>
-      <nav className={mobileOpen ? 'nav-links nav-links--open' : 'nav-links'}>
-        <a href="/#how" onClick={() => setMobileOpen(false)}>工作方式</a>
-        <a href="/#privacy" onClick={() => setMobileOpen(false)}>隐私</a>
-        <button className="nav-pill" onClick={goToStart}>开始检查 <ArrowRight size={15} /></button>
-      </nav>
-      <button className="menu-button" onClick={() => setMobileOpen(!mobileOpen)} aria-label="打开菜单">
-        {mobileOpen ? <X /> : <Menu />}
-      </button>
-    </header>
+    <>
+      <header className={`top-nav ${stage !== 'intake' ? 'top-nav--light' : ''}`}>
+        <button className="brand" onClick={onReset} aria-label="回到首页">
+          <LogoMark />
+          <span>SubmitGuard</span>
+        </button>
+        <div className="nav-center">
+          <span className="signal"><i /> SYSTEM READY</span>
+          <span className="nav-divider" />
+          <span>PRIVATE BETA · 01</span>
+        </div>
+      </header>
+      <StaggeredMenu items={menuItems} onNavigate={handleNavigate} />
+    </>
   )
 }
 
@@ -252,6 +272,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
       <section className={`hero ${heroReady ? 'hero--ready' : ''}`}>
         <div className="hero-noise" />
         <Hero3D />
+        <Ribbons />
         <div className="hero-copy">
           <div className="eyebrow reveal reveal--1"><Sparkles size={15} /> 作业提交前智能检查</div>
           <h1 className="hero-title">
@@ -274,6 +295,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
       </section>
 
       <section className="workspace-section" id="workspace">
+        <DotField />
         <div className="section-index scroll-reveal" data-scroll-reveal>01 — ASSIGNMENT BRIEF</div>
         <div className="workspace-heading">
           <h2 className="scroll-reveal" data-scroll-reveal>先告诉我们，<br />老师要求了什么。</h2>

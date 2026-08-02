@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      gsap:
+        specifier: ^3.12.5
+        version: 3.15.0
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@18.3.1)
+      ogl:
+        specifier: ^1.0.11
+        version: 1.0.11
       pdfjs-dist:
         specifier: 6.2.108
         version: 6.2.108
@@ -627,6 +633,9 @@ packages:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
 
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
+
   js-tokens@3.0.0:
     resolution: {integrity: sha512-poXEQHPMmTrYZuJgNRll2sbc3kJsSU1m/g1Q93IE6txNj3p6xOOOmdj1G/zCVGawYSPzTkSoWGg1otqbeqKJeg==}
 
@@ -669,6 +678,9 @@ packages:
   node-releases@2.0.51:
     resolution: {integrity: sha512-wRNIrw4DmVLKQlbgOMdkMx27Wrpzes2hh5Jtbi2bjPd+4wJstWIqP5A+lscnqbm0xxmT5Bpg8Lec5ItEBwx6BQ==}
     engines: {node: '>=18'}
+
+  ogl@1.0.11:
+    resolution: {integrity: sha512-kUpC154AFfxi16pmZUK4jk3J+8zxwTWGPo03EoYA8QPbzikHoaC82n6pNTbd+oEaJonaE8aPWBlX7ad9zrqLsA==}
 
   pdfjs-dist@6.2.108:
     resolution: {integrity: sha512-YxFb+SQcodN2rnX9Tn3dHYlqfb7NjlzzfONPpJd+AKoKtUjEdevTfbC07d5TcczzOK6261auRkP/M8OBHs9vFQ==}
@@ -1243,6 +1255,8 @@ snapshots:
 
   gensync@1.0.0-beta.2: {}
 
+  gsap@3.15.0: {}
+
   js-tokens@3.0.0: {}
 
   js-tokens@4.0.0: {}
@@ -1270,6 +1284,8 @@ snapshots:
   nanoid@3.3.16: {}
 
   node-releases@2.0.51: {}
+
+  ogl@1.0.11: {}
 
   pdfjs-dist@6.2.108:
     optionalDependencies:
