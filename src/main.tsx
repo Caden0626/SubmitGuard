@@ -40,6 +40,7 @@ import {
   type Severity,
   type UploadedPdf,
 } from './pdfInspection'
+import Hero3D from './Hero3D'
 import './styles.css'
 
 type Stage = 'intake' | 'rules' | 'upload' | 'processing' | 'results'
@@ -250,6 +251,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
     <main className="intake-page" ref={intakeRef}>
       <section className={`hero ${heroReady ? 'hero--ready' : ''}`}>
         <div className="hero-noise" />
+        <Hero3D />
         <div className="hero-copy">
           <div className="eyebrow reveal reveal--1"><Sparkles size={15} /> 作业提交前智能检查</div>
           <h1 className="hero-title">
