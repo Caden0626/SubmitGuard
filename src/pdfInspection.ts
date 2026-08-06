@@ -300,6 +300,44 @@ function severityOrder(severity: Severity) {
   return severity === 'must_fix' ? 0 : severity === 'review' ? 1 : 2
 }
 
+export async function extractPdfFullText(file: File): Promise<string> {
+  await assertPdfHeader(file)
+  const { getDocument } = await loadPdfJs()
+  let loadingTask: PDFDocumentLoadingTask | undefined
+  try {
+    loadingTask = getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
+    const pdf = await loadingTask.promise
+    const pageTexts: string[] = []
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber)
+      const content = await page.getTextContent()
+      pageTexts.push(textFromItems(content.items))
+    }
+    return pageTexts.join('\n').trim()
+  } finally {
+    await loadingTask?.destroy()
+  }
+}
+
+export async function extractRequirementsWithAI(requirementText: string): Promise<RequirementRule[]> {
+  const trimmed = requirementText.trim()
+  if (trimmed.length < 10) return []
+
+  const response = await fetch('/api/extract-requirements', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requirementText: trimmed.slice(0, 16000) }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: '网络请求失败' }))
+    throw new Error(errorData.error || `请求失败 (${response.status})`)
+  }
+
+  const data = await response.json()
+  return data.rules || []
+}
+
 export async function inspectPdf(
   uploaded: UploadedPdf,
   rules: RequirementRule[],

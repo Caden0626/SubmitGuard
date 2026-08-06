@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   AlertTriangle,
@@ -31,7 +31,9 @@ import {
   Zap,
 } from 'lucide-react'
 import {
+  extractPdfFullText,
   extractRequirementRules,
+  extractRequirementsWithAI,
   inspectPdf,
   readPdfSummary,
   type CheckItem,
@@ -216,16 +218,23 @@ function OrbitalGraphic() {
   )
 }
 
-function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
+function Intake({ requirement, setRequirement, onAnalyze, onAnalyzeWithRules, isAnalyzing, showToast }: {
   requirement: string
   setRequirement: (value: string) => void
   onAnalyze: () => void
+  onAnalyzeWithRules: (rules: RequirementRule[]) => void
+  isAnalyzing: boolean
   showToast: (message: string) => void
 }) {
   const intakeRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text')
   const [heroReady, setHeroReady] = useState(false)
+  const [extractedText, setExtractedText] = useState('')
+  const [isExtractingText, setIsExtractingText] = useState(false)
+  const [isExtractingAI, setIsExtractingAI] = useState(false)
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
 
   useEffect(() => {
     let active = true
@@ -267,6 +276,45 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
     setInputMode('text')
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
+
+  const handlePdfFile = async (chosen?: File) => {
+    if (!chosen) return
+    setIsExtractingText(true)
+    setPdfFile(chosen)
+    try {
+      const text = await extractPdfFullText(chosen)
+      setExtractedText(text)
+      setRequirement(text)
+      showToast(`已从 ${chosen.name} 提取 ${text.length.toLocaleString()} 个字符，可编辑后点击 AI 提取。`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'PDF 文字提取失败，请确认文件是文字型 PDF。')
+      setPdfFile(null)
+    } finally {
+      setIsExtractingText(false)
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+    }
+  }
+
+  const handleAIExtract = async () => {
+    if (!extractedText.trim()) {
+      showToast('请先上传一份作业说明 PDF。')
+      return
+    }
+    setIsExtractingAI(true)
+    try {
+      const rules = await extractRequirementsWithAI(extractedText)
+      if (rules.length === 0) {
+        showToast('AI 未识别到明确规则，请检查文本内容或切换到文字粘贴模式手动输入。')
+      } else {
+        showToast(`AI 已识别 ${rules.length} 条规则，请在下一页确认。`)
+        onAnalyzeWithRules(rules)
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'AI 提取失败，请检查网络后重试。')
+    } finally {
+      setIsExtractingAI(false)
+    }
+  }
   return (
     <main className="intake-page" ref={intakeRef}>
       <section className={`hero ${heroReady ? 'hero--ready' : ''}`}>
@@ -307,7 +355,7 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
               <FileText size={17} /> 粘贴要求
             </button>
             <button className={inputMode === 'file' ? 'is-active' : ''} onClick={() => setInputMode('file')} role="tab">
-              <Upload size={17} /> 上传要求 PDF <span>BETA</span>
+              <Upload size={17} /> 上传要求 PDF <span>AI</span>
             </button>
           </div>
           {inputMode === 'text' ? (
@@ -325,17 +373,47 @@ function Intake({ requirement, setRequirement, onAnalyze, showToast }: {
               </div>
             </div>
           ) : (
-            <button className="requirement-drop" onClick={() => showToast('基础版中，请先使用文字粘贴；要求 PDF 解析将在下一版开放。')}>
-              <span className="drop-icon"><Upload size={24} /></span>
-              <strong>拖入作业说明 PDF</strong>
-              <small>仅支持文字型 PDF · 最大 10 MB</small>
-              <em>选择文件</em>
-            </button>
+            <div className="file-requirement-area">
+              {!pdfFile ? (
+                <div
+                  className={`requirement-drop ${isExtractingText ? 'is-validating' : ''}`}
+                  onClick={() => pdfInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); void handlePdfFile(e.dataTransfer.files[0]) }}
+                >
+                  <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" onChange={(e) => handlePdfFile(e.target.files?.[0])} />
+                  <span className="drop-icon">{isExtractingText ? <LoaderCircle className="spin" size={24} /> : <Upload size={24} />}</span>
+                  <strong>{isExtractingText ? '正在提取 PDF 文字…' : '拖入作业说明 PDF'}</strong>
+                  <small>仅支持文字型 PDF · 最大 30 MB</small>
+                </div>
+              ) : (
+                <div className="textarea-wrap">
+                  <div className="extracted-header">
+                    <FileText size={17} />
+                    <span><strong>{pdfFile.name}</strong> · 已提取文字，可编辑</span>
+                    <button onClick={() => { setPdfFile(null); setExtractedText(''); setRequirement('') }} title="移除文件"><X size={16} /></button>
+                  </div>
+                  <textarea
+                    value={extractedText}
+                    onChange={(e) => { setExtractedText(e.target.value); setRequirement(e.target.value) }}
+                    placeholder="已从 PDF 提取的文字会显示在这里…"
+                    aria-label="已提取的作业要求"
+                    rows={10}
+                  />
+                  <div className="textarea-footer">
+                    <span>{extractedText.length} / 16,000</span>
+                    <button className="ai-extract-btn" onClick={handleAIExtract} disabled={isExtractingAI || !extractedText.trim()}>
+                      {isExtractingAI ? <><LoaderCircle className="spin" size={15} /> AI 分析中…</> : <><Sparkles size={15} /> AI 提取规则</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           <div className="intake-action-row">
             <div className="privacy-inline"><Fingerprint size={19} /><span>内容仅用于本次检查<br /><small>不会用于训练模型</small></span></div>
-            <button className="primary-action" onClick={onAnalyze}>
-              <span>提取检查规则</span><ArrowRight size={19} />
+            <button className="primary-action" onClick={onAnalyze} disabled={isAnalyzing}>
+              {isAnalyzing ? <><LoaderCircle className="spin" size={19} /> AI 分析中…</> : <><span>提取检查规则</span><ArrowRight size={19} /></>}
             </button>
           </div>
         </div>
@@ -684,6 +762,7 @@ function App() {
   const [checks, setChecks] = useState(initialChecks)
   const [inspection, setInspection] = useState<PdfInspectionResult | null>(null)
   const [toast, setToast] = useState('')
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   const showToast = (message: string) => {
     setToast(message)
@@ -701,13 +780,34 @@ function App() {
     setInspection(null)
   }
 
-  const analyze = () => {
+  const analyze = async () => {
     if (!requirement.trim()) {
-      showToast('请先粘贴作业要求，或点击“使用示例要求”。')
+      showToast('请先粘贴作业要求，或点击\u201c使用示例要求\u201d。')
       document.querySelector('#workspace')?.scrollIntoView({ behavior: 'smooth' })
       return
     }
-    setRules(extractRequirementRules(requirement))
+    setIsAnalyzing(true)
+    try {
+      const aiRules = await extractRequirementsWithAI(requirement)
+      if (aiRules.length === 0) {
+        showToast('AI 未识别到明确规则，使用本地规则提取作为备选。')
+        setRules(extractRequirementRules(requirement))
+      } else {
+        showToast('AI 已识别 ' + aiRules.length + ' 条规则，请在下一页确认。')
+        setRules(aiRules)
+      }
+      setStage('rules')
+    } catch {
+      showToast('AI 提取失败，已使用本地规则提取作为备选。')
+      setRules(extractRequirementRules(requirement))
+      setStage('rules')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const analyzeWithRules = (aiRules: RequirementRule[]) => {
+    setRules(aiRules)
     setStage('rules')
   }
 
@@ -756,7 +856,7 @@ function App() {
   return (
     <div className={`site site--${stage}`}>
       <TopNav stage={stage} onReset={reset} />
-      {stage === 'intake' && <Intake requirement={requirement} setRequirement={setRequirement} onAnalyze={analyze} showToast={showToast} />}
+      {stage === 'intake' && <Intake requirement={requirement} setRequirement={setRequirement} onAnalyze={analyze} onAnalyzeWithRules={analyzeWithRules} isAnalyzing={isAnalyzing} showToast={showToast} />}
       {stage === 'rules' && <RulesScreen rules={rules} setRules={setRules} requirement={requirement} onBack={() => setStage('intake')} onContinue={() => setStage('upload')} />}
       {stage === 'upload' && <UploadScreen onBack={() => setStage('rules')} onCheck={() => void beginCheck()} file={file} setFile={setFile} showToast={showToast} />}
       {stage === 'processing' && <ProcessingScreen progress={progress} />}

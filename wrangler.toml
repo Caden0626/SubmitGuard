@@ -1,0 +1,5 @@
+name = "submitguard"
+compatibility_date = "2025-08-01"
+pages_build_output_dir = "dist"
+
+# DEEPSEEK_API_KEY is set via `npx wrangler secret put DEEPSEEK_API_KEY`
